@@ -46,6 +46,8 @@ exports.registerUser = async (req, res) => {
 // 📌 Login
 exports.loginUser = async (req, res) => {
   try {
+    
+    console.log("LOGIN REQUEST:", req.body);
     const { email, password } = req.body;
 
     // Find user
