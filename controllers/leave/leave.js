@@ -357,11 +357,10 @@ exports.updateLeave = async (req, res) => {
     // Checking for already applied dates
     const alreadyAppliedDate = await Leave.find({
       user: req.user?._id,
-      _id: { $ne: req.params.id }, // Exclude current leave 
+      _id: { $ne: req.params.id }, // Exclude current leave
       leaveDates: { $in: req.body?.dates },
       status: { $ne: "rejected" },
     });
-
 
     if (alreadyAppliedDate.length > 0) {
       if (req.file?.filename) {
@@ -392,6 +391,25 @@ exports.updateLeave = async (req, res) => {
         status: "error",
         message: "Weekend dates are not allowed.",
       });
+    }
+
+    // Delete Old Attachment if new attachment is there
+
+    if (req.file) {
+      try {
+        const isRaw =
+          leave.attachmentUrl.endsWith(".pdf") ||
+          leave.attachmentUrl.endsWith(".docx");
+        const result = await cloudinary.uploader.destroy(
+          leave.attachmentPublicId,
+          {
+            resource_type: isRaw ? "raw" : "image",
+          }
+        );
+        console.log("Cloudinary Old file deleted due to update:", result);
+      } catch (cloudErr) {
+        console.error("Cloudinary cleanup failed in Updating:", cloudErr);
+      }
     }
 
     // 4. Proceed with update
