@@ -328,7 +328,7 @@ exports.updateLeave = async (req, res) => {
       });
     }
 
-    // for leave change history
+    // For leave change history
     const oldDates = leave.leaveDates.map((d) => new Date(d).getTime()).sort();
     const newDates = dates.map((d) => new Date(d).getTime()).sort();
 
@@ -354,10 +354,53 @@ exports.updateLeave = async (req, res) => {
       };
     }
 
+    // Checking for already applied dates
+    const alreadyAppliedDate = await Leave.find({
+      user: req.user?._id,
+      _id: { $ne: req.params.id }, // Exclude current leave 
+      leaveDates: { $in: req.body?.dates },
+      status: { $ne: "rejected" },
+    });
+
+
+    if (alreadyAppliedDate.length > 0) {
+      if (req.file?.filename) {
+        try {
+          const isRaw =
+            req.file.filename.endsWith(".pdf") ||
+            req.file.filename.endsWith(".docx");
+          const result = await cloudinary.uploader.destroy(req.file.filename, {
+            resource_type: isRaw ? "raw" : "image",
+          });
+          console.log("Cloudinary file deleted due to failure:", result);
+        } catch (cloudErr) {
+          console.error("Cloudinary cleanup failed:", cloudErr);
+        }
+      }
+      return res.status(400).json({
+        status: "error",
+        message: "Already applied for This Dates",
+        alreadyAppliedDate,
+      });
+    }
+
+    //Checking for Weekend's
+    const hasweekend = dates.some((d) => isweekend(d));
+
+    if (hasweekend) {
+      return res.status(400).json({
+        status: "error",
+        message: "Weekend dates are not allowed.",
+      });
+    }
+
     // 4. Proceed with update
     leave.leaveDates = formattedDates;
     leave.reason = reason;
-    leave.attachmentUrl = req.file ? req.file?.filename : leave.attachmentUrl;
+    leave.attachmentUrl = req?.file ? req.file?.path : leave.attachmentUrl;
+    leave.attachmentPublicId = req?.file
+      ? req.file?.filename
+      : leave.attachmentPublicId;
     leave.status = "pending";
     leave.lastModifiedBy = req.user._id;
 
